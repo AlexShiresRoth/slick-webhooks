@@ -1,4 +1,4 @@
-require("dotenv").config();
+// require("dotenv").config();
 const axios = require("axios");
 const express = require("express");
 const stripe = require("stripe")(process.env.STRIPE_TEST_SECRET);
@@ -10,6 +10,8 @@ const app = express();
 app.use(cors());
 
 app.use(express.json({ extended: false }));
+
+app.get("/api", (req, res) => res.send("WEBHOOK IS RUNNING"));
 
 const state = {
   order: null,
