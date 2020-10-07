@@ -16,6 +16,7 @@ app.get("/api", (req, res) => res.send("WEBHOOK IS RUNNING"));
 const state = {
   order: null,
   interval: null,
+  users: [],
 };
 
 //call the order processing endpoint
@@ -47,7 +48,7 @@ const handleOrderProcessing = async (paymentIntent) => {
 //@route POST route
 //@desc create webhook
 //@access public
-const endpointSecret = `whsec_y61oDCIkKIIcFWVxNDcOpRVgUP2kswPZ`;
+// const endpointSecret = `whsec_y61oDCIkKIIcFWVxNDcOpRVgUP2kswPZ`;
 app.post(
   "/stripe",
   bodyParser.raw({ type: "application/json" }),
@@ -78,8 +79,6 @@ app.post(
     //   }
     // }
 
-    console.log(request.body);
-
     switch (event.type) {
       case "payment_intent.created":
         console.log("paymentintent created");
@@ -89,20 +88,40 @@ app.post(
         const paymentIntent = event.data.object;
         console.log(`PaymentIntent for ${paymentIntent.amount} was successful`);
         //call to store api endpoint to trigger order processing
-        state.order = await handleOrderProcessing(paymentIntent);
+        let order = await handleOrderProcessing(paymentIntent);
 
-        if (state.order instanceof Error) {
+        //order processing error? break out of hook and send a failing response
+        if (order instanceof Error) {
           console.log(
             "order error !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
           );
-          state.order = JSON.stringify({
+          order = JSON.stringify({
             msg: state.order.message,
             type: "Error",
           });
           return response.status(500);
         }
+        //search array of users to find a matching active user to the ordering process
+        const foundUser = state.users.filter((obj) => {
+          return obj.user === paymentIntent.metadata.shopifyToken;
+        });
 
-        console.log("order successful");
+        console.log("this is a found user:", foundUser);
+        //if there is no connected user, fail the payment process
+        if (foundUser.length <= 0) {
+          return response
+            .status(500)
+            .json({ msg: "Could not find a connected user" });
+        }
+
+        //if there is a current user, update their order object
+
+        state.users = state.users.map((obj) => {
+          return obj.user === paymentIntent.metadata.shopifyToken
+            ? { order, user: obj.user }
+            : { order: {}, user: obj.user };
+        });
+        console.log("updated uysers23432542234", state.users);
 
         response.status(200);
         break;
@@ -124,26 +143,31 @@ const server = http.createServer(app);
 const io = require("socket.io")(server);
 
 io.on("connection", (client) => {
-  console.log("connected to ordering", state.interval);
+  console.log("connected to ordering");
 
   if (state.interval) {
     clearInterval(state.interval);
   }
 
-  if (state.order && state.order.financial_status) {
-    if (state.order.financial_status === "paid") state.order = null;
-  }
+  state.interval = setInterval(() => client.emit("order", state.users), 4000);
 
-  state.interval = setInterval(() => client.emit("order", state.order), 4000);
+  client.on("add-user", (data) => {
+    let foundUser = false;
+    if (state.users.filter((info) => info.user === data).length > 0) {
+      console.log("found a user");
+      foundUser = true;
+    }
 
-  client.on("disconnect", () => {
-    console.log("ordering disconnected");
+    if (!foundUser) state.users.push({ user: data, order: {} });
+  });
 
-    state.order = null;
+  client.on("disconnect", (data) => {
+    console.log("user disconnected");
+
+    // state.users = [];
     clearInterval(state.interval);
   });
 });
-
 const PORT = process.env.PORT || 4000;
 
 server.listen(PORT, () =>
