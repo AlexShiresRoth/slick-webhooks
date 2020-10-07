@@ -1,3 +1,4 @@
+require("dotenv").config();
 const axios = require("axios");
 const express = require("express");
 const stripe = require("stripe")(process.env.STRIPE_TEST_SECRET);
