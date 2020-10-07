@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-=======
-// require("dotenv").config();
->>>>>>> 47a19e65f98b0a9f6b9965f72eafca37f7d6dfce
 const axios = require("axios");
 const express = require("express");
 const stripe = require("stripe")(process.env.STRIPE_TEST_SECRET);
@@ -89,7 +85,6 @@ app.post(
         break;
       case "payment_intent.succeeded":
         const paymentIntent = event.data.object;
-<<<<<<< HEAD
 
         //search array of users to find a matching active user to the ordering process
         const foundUser = state.users.filter((obj) => {
@@ -103,9 +98,6 @@ app.post(
             .status(500)
             .json({ msg: "Could not find a connected user" });
         }
-=======
-        console.log(`PaymentIntent for ${paymentIntent.amount} was successful`);
->>>>>>> 47a19e65f98b0a9f6b9965f72eafca37f7d6dfce
         //call to store api endpoint to trigger order processing
         let order = await handleOrderProcessing(paymentIntent);
 
@@ -120,26 +112,8 @@ app.post(
           });
           return response.status(500);
         }
-<<<<<<< HEAD
         console.log(`PaymentIntent for ${paymentIntent.amount} was successful`);
         //if there is a current user, update their order object
-=======
-        //search array of users to find a matching active user to the ordering process
-        const foundUser = state.users.filter((obj) => {
-          return obj.user === paymentIntent.metadata.shopifyToken;
-        });
-
-        console.log("this is a found user:", foundUser);
-        //if there is no connected user, fail the payment process
-        if (foundUser.length <= 0) {
-          return response
-            .status(500)
-            .json({ msg: "Could not find a connected user" });
-        }
-
-        //if there is a current user, update their order object
-
->>>>>>> 47a19e65f98b0a9f6b9965f72eafca37f7d6dfce
         state.users = state.users.map((obj) => {
           return obj.user === paymentIntent.metadata.shopifyToken
             ? { order, user: obj.user }
