@@ -4,8 +4,9 @@
   "description": "",
   "main": "webhooks.js",
   "scripts": {
-    "start": "node webhooks.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "SET NODE_ENV=production & node webhooks.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "SET NODE_ENV=development & nodemon webhooks.js"
   },
   "author": "",
   "license": "ISC",

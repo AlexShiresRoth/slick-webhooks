@@ -13,11 +13,17 @@ app.use(express.json({ extended: false }));
 
 app.get("/api", (req, res) => res.send("WEBHOOK IS RUNNING"));
 
+const prodEndPoint =
+  "https://pc-ecommerce-server.herokuapp.com/api/store/processorder";
+const devEndPoint = "http://localhost:5000/api/store/processorder";
+
 const state = {
   order: null,
   interval: null,
   users: [],
 };
+
+console.log("NODE ENVIRONMENT:", process.env.NODE_ENV);
 
 //call the order processing endpoint
 const handleOrderProcessing = async (paymentIntent) => {
@@ -30,7 +36,7 @@ const handleOrderProcessing = async (paymentIntent) => {
 
   try {
     const response = await axios.post(
-      "https://pc-ecommerce-server.herokuapp.com/api/store/processorder",
+      process.env.NODE_ENV === "production" ? prodEndPoint : devEndPoint,
       paymentIntent
     );
 
