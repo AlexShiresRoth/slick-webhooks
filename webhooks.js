@@ -5,6 +5,7 @@ const stripe = require("stripe")(process.env.STRIPE_TEST_SECRET);
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const http = require("http");
+const { FaSatellite } = require("react-icons/fa");
 const app = express();
 
 app.use(cors());
@@ -35,6 +36,7 @@ const handleOrderProcessing = async (paymentIntent) => {
   }
 
   try {
+    //pass the paymentIntent data to the order endpoint
     const response = await axios.post(
       process.env.NODE_ENV === "production" ? prodEndPoint : devEndPoint,
       paymentIntent
@@ -70,21 +72,6 @@ app.post(
       return response.status(500).json({ msg: "Webhook Error" });
     }
 
-    // if (endpointSecret) {
-    //   try {
-    //     event = stripe.webhooks.constructEvent(
-    //       request,
-    //       signature,
-    //       endpointSecret
-    //     );
-    //   } catch (error) {
-    //     console.log(`Webhook signature verification failed`, error);
-    //     return response
-    //       .status(200)
-    //       .send("Webhook signature verification failed");
-    //   }
-    // }
-
     switch (event.type) {
       case "payment_intent.created":
         console.log("paymentintent created");
@@ -97,8 +84,8 @@ app.post(
         const foundUser = state.users.filter((obj) => {
           return obj.user === paymentIntent.metadata.shopifyToken;
         });
-        //if there are no found users fail
-        console.log("this is a found user:", foundUser);
+        //if there are no found users, fail to prevent double charging
+        // console.log("this is a found user:", foundUser);
         //if there is no connected user, fail the payment process
         if (foundUser.length <= 0) {
           return response
@@ -113,18 +100,24 @@ app.post(
           console.log(
             "order error !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
           );
-          order = JSON.stringify({
-            msg: state.order.message,
+          order = {
+            msg: "Error processing order",
             type: "Error",
+          };
+          //mutate state of users
+          state.users = state.users.map((obj) => {
+            return obj.user === paymentIntent.metadata.shopifyToken
+              ? { order: {}, user: obj.user, errors: [order] }
+              : { order: {}, user: obj.user, errors: [] };
           });
-          return response.status(500);
+          return response.status(500).json(order);
         }
         console.log(`PaymentIntent for ${paymentIntent.amount} was successful`);
         //if there is a current user, update their order object
         state.users = state.users.map((obj) => {
           return obj.user === paymentIntent.metadata.shopifyToken
-            ? { order, user: obj.user }
-            : { order: {}, user: obj.user };
+            ? { order, user: obj.user, errors: [] }
+            : { order: {}, user: obj.user, errors: [] };
         });
         console.log("updated uysers23432542234", state.users);
 
@@ -163,7 +156,7 @@ io.on("connection", (client) => {
       foundUser = true;
     }
 
-    if (!foundUser) state.users.push({ user: data, order: {} });
+    if (!foundUser) state.users.push({ user: data, order: {}, errors: [] });
   });
 
   client.on("disconnect", (data) => {
@@ -171,6 +164,8 @@ io.on("connection", (client) => {
 
     // state.users = [];
     clearInterval(state.interval);
+
+    // state.users = state.users.filter(user => user)
   });
 });
 const PORT = process.env.PORT || 4000;
