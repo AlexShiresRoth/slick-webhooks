@@ -1,7 +1,7 @@
 require("dotenv").config();
 const axios = require("axios");
 const express = require("express");
-const stripe = require("stripe")(process.env.STRIPE_TEST_SECRET);
+const stripe = require("stripe")(process.env.STRIPE_LIVE_SECRET);
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const http = require("http");
