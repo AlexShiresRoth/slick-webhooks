@@ -5,7 +5,6 @@ const stripe = require("stripe")(process.env.STRIPE_LIVE_SECRET);
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const http = require("http");
-const { FaSatellite } = require("react-icons/fa");
 const app = express();
 
 app.use(cors());
