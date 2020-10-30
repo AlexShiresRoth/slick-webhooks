@@ -83,7 +83,7 @@ app.post(
     // console.log("this is a found user:", foundUser);
     //if there is no connected user, fail the payment process
     if (foundUser.length <= 0) {
-      return response.status(300).json({
+      return response.status(200).json({
         msg: "User is not connected to server, order will not be processed",
       });
     }
