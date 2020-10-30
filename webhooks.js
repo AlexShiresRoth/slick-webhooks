@@ -1,7 +1,7 @@
 require("dotenv").config();
 const axios = require("axios");
 const express = require("express");
-const stripe = require("stripe")(process.env.STRIPE_LIVE_SECRET);
+const stripe = require("stripe")(process.env.STRIPE_TEST_SECRET);
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const http = require("http");
@@ -27,10 +27,10 @@ const state = {
 console.log("NODE ENVIRONMENT:", process.env.NODE_ENV);
 
 //call the order processing endpoint
-const handleOrderProcessing = async (paymentIntent) => {
+const handleOrderProcessing = async (paymentIntent, foundUser) => {
   //Do not resend order request if order has been paid
-  if (state.order && order.financial_status) {
-    if (state.order.financial_status === "paid") {
+  if (foundUser && foundUser.order) {
+    if (foundUser.order.financial_status === "paid") {
       return new Error("Order has already been paid");
     }
   }
@@ -56,13 +56,13 @@ const handleOrderProcessing = async (paymentIntent) => {
 //@route POST route
 //@desc create webhook
 //@access public
-// const endpointSecret = `whsec_y61oDCIkKIIcFWVxNDcOpRVgUP2kswPZ`;
 app.post(
   "/stripe",
   bodyParser.raw({ type: "application/json" }),
   async (request, response) => {
     const signature = request.headers["stripe-signature"];
     let event;
+    let order;
 
     try {
       event = request.body;
@@ -79,12 +79,13 @@ app.post(
       return obj.user === event.data.object.metadata.shopifyToken;
     });
     //if there are no found users, fail to prevent double charging
+    //or charging for items not listed in store
     // console.log("this is a found user:", foundUser);
     //if there is no connected user, fail the payment process
     if (foundUser.length <= 0) {
-      return response
-        .status(500)
-        .json({ msg: "Could not find a connected user" });
+      return response.status(300).json({
+        msg: "User is not connected to server, order will not be processed",
+      });
     }
 
     try {
@@ -96,8 +97,10 @@ app.post(
         case "payment_intent.succeeded":
           const paymentIntent = event.data.object;
 
-          //call to store api endpoint to trigger order processing
-          let order = await handleOrderProcessing(paymentIntent);
+          if (foundUser) {
+            //call to store api endpoint to trigger order processing
+            order = await handleOrderProcessing(paymentIntent, foundUser);
+          }
 
           //order processing error? break out of hook and send a failing response
           if (order instanceof Error) {
@@ -114,7 +117,7 @@ app.post(
                 ? { order: {}, user: obj.user, errors: [order] }
                 : { order: {}, user: obj.user, errors: [] };
             });
-            return response.status(500).json(order);
+            return response.status(200).json(order);
           }
           console.log(
             `PaymentIntent for ${paymentIntent.amount} was successful`
@@ -125,7 +128,14 @@ app.post(
               ? { order, user: obj.user, errors: [] }
               : { order: {}, user: obj.user, errors: [] };
           });
-          console.log("updated ussssssssssers23432542234", state.users);
+          console.log(
+            `UPDATED USER: ${
+              state.users.filter(
+                (obj) => obj.user === paymentIntent.metadata.shopifyToken
+              )[0].user
+            }`,
+            state.users
+          );
 
           response.status(200);
           break;
@@ -136,6 +146,8 @@ app.post(
           break;
         default:
           console.log(`Unhandled event type ${event.type}`);
+          response.status(200);
+          break;
       }
     } catch (error) {
       console.log("ERROROROROROROROR", error);
@@ -162,7 +174,7 @@ io.on("connection", (client) => {
   //keeps sending user state to client
   state.interval2 = setInterval(() => client.emit("users", state.users), 1000);
 
-  // console.log("is there an interval?", state);
+  console.log("is there an interval?", state.users);
 
   client.on("add-user", (data) => {
     let foundUser = false;
