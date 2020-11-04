@@ -1,7 +1,8 @@
 require("dotenv").config();
 const axios = require("axios");
 const express = require("express");
-const stripe = require("stripe")(process.env.STRIPE_TEST_SECRET);
+const stripe = require("stripe")(process.env.STRIPE_LIVE_SECRET);
+const Shopify = require("shopify-api-node");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const http = require("http");
@@ -12,6 +13,12 @@ app.use(cors());
 app.use(express.json({ extended: false }));
 
 app.get("/api", (req, res) => res.send("WEBHOOK IS RUNNING"));
+
+const shopify = new Shopify({
+  shopName: "luciana-rose-couture.myshopify.com",
+  apiKey: process.env.SHOPIFY_ADMIN_KEY,
+  password: process.env.SHOPIFY_ADMIN_PASSWORD,
+});
 
 const prodEndPoint =
   "https://pc-ecommerce-server.herokuapp.com/api/store/processorder";
@@ -128,14 +135,14 @@ app.post(
               ? { order, user: obj.user, errors: [] }
               : { order: {}, user: obj.user, errors: [] };
           });
-          console.log(
-            `UPDATED USER: ${
-              state.users.filter(
-                (obj) => obj.user === paymentIntent.metadata.shopifyToken
-              )[0].user
-            }`,
-            state.users
-          );
+          // console.log(
+          //   `UPDATED USER: ${
+          //     state.users.filter(
+          //       (obj) => obj.user === paymentIntent.metadata.shopifyToken
+          //     )[0].user
+          //   }`,
+          //   state.users
+          // );
 
           response.status(200);
           break;
@@ -157,13 +164,133 @@ app.post(
     response.status(200).json({ msg: "Order processed" });
   }
 );
+//@route POST route
+//@desc cancelling whole order
+//@access private
+app.post("/shopify-webhook-cancel-order", async (req, res) => {
+  const { note_attributes } = req.body;
+  console.log("CANCELING ORDER:", note_attributes);
+
+  if (!note_attributes || note_attributes.length === 0) {
+    return res
+      .status(400)
+      .json({ msg: "Not a canceled order from the framework api" });
+  }
+  const stripeChargeID = note_attributes.filter(
+    (attr) => attr.name.toLowerCase() === "stripe charge id"
+  )[0].value;
+
+  if (!stripeChargeID) {
+    return res
+      .status(400)
+      .json({ msg: "Webhook failed to locate a stripe charge id" });
+  }
+
+  const foundCharge = await stripe.charges.retrieve(stripeChargeID);
+
+  if (!foundCharge) {
+    return res
+      .status(400)
+      .json({ msg: "Could not find a charge object with that id" });
+  }
+
+  if (foundCharge.refunded) {
+    console.log("this is a found charge error!!!!!!!", foundCharge);
+    return res.status(400).json({ msg: "Charge was already refunded" });
+  }
+
+  const refund = await stripe.refunds.create({
+    charge: stripeChargeID,
+  });
+
+  console.log(
+    "THIS IS THE REFUND OBJECT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  );
+  console.log(refund.status);
+  console.log(
+    "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  );
+  if (!refund) {
+    res.status(400).json({ msg: "Charge already refunded" });
+  }
+  try {
+    res.json(refund);
+  } catch (error) {
+    console.error("there was an error processing the refund", error);
+    res.status(500).json({ msg: "Internal Server Error" });
+  }
+});
+//@route POST route
+//@desc refunding from shopify api
+//@access private
+app.post("/shopify-webhook-refund-order", async (req, res) => {
+  const { refund_line_items, transactions, order_id } = req.body;
+  console.log("TRANSACTIONSSSSSS!!!!!!", transactions);
+
+  if (transactions.length <= 0) {
+    console.log("Transactions are empty");
+    return res.status(400).json({ msg: "No transactions" });
+  }
+  const amount = transactions.reduce((acc, lineItem) => {
+    return acc + parseFloat(lineItem.amount);
+  }, 0);
+
+  const foundOrder = await shopify.order.get(order_id, []);
+  const orderAttributes = foundOrder.note_attributes;
+
+  console.log("FOUND AN ORDER ATTRIBUTES OBJECT:", orderAttributes);
+  if (!foundOrder) {
+    return res
+      .status(400)
+      .json({ msg: "Could not find an order for this refund attempt" });
+  }
+
+  const formattedAmt = Math.ceil(amount * 100);
+
+  const stripeChargeID = orderAttributes.filter(
+    (attr) => attr.name.toLowerCase() === "stripe charge id"
+  )[0].value;
+
+  console.log("THIS IS THE AMOUNT FGSDGDFGDSGFDSFSDFSDFSADFSFSDF", amount);
+  if (!stripeChargeID) {
+    return res
+      .status(400)
+      .json({ msg: "Webhook failed to locate a stripe charge id" });
+  }
+
+  const foundCharge = await stripe.charges.retrieve(stripeChargeID);
+
+  if (!foundCharge) {
+    console.error("could not find a charge");
+    return res
+      .status(400)
+      .json({ msg: "Could not find a charge object with that id" });
+  }
+
+  if (foundCharge.refunded) {
+    console.log("this is a found charge error!!!!!!!", foundCharge);
+    return res.status(400).json({ msg: "Charge was already refunded" });
+  }
+
+  const refund = await stripe.refunds.create({
+    charge: stripeChargeID,
+    amount: formattedAmt ? formattedAmt : 0,
+  });
+
+  try {
+    res.json(refund);
+  } catch (error) {
+    console.error("there was an error processing the refund", error);
+    res.status(500).json({ msg: "Internal Server Error" });
+  }
+});
 
 const server = http.createServer(app);
 
 const io = require("socket.io")(server);
 
 io.on("connection", (client) => {
-  console.log("connected to ordering", state.users);
+  // console.log("connected to ordering", state.users);
 
   if (state.interval) {
     clearInterval(state.interval);
@@ -174,7 +301,7 @@ io.on("connection", (client) => {
   //keeps sending user state to client
   state.interval2 = setInterval(() => client.emit("users", state.users), 1000);
 
-  console.log("is there an interval?", state.users);
+  // console.log("is there an interval?", state.users);
 
   client.on("add-user", (data) => {
     let foundUser = false;
