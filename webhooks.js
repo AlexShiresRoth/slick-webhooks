@@ -224,7 +224,7 @@ app.post("/shopify-webhook-cancel-order", async (req, res) => {
 //@desc refunding from shopify api
 //@access private
 app.post("/shopify-webhook-refund-order", async (req, res) => {
-  const { refund_line_items, transactions, order_id } = req.body;
+  const { transactions, order_id } = req.body;
   console.log("TRANSACTIONSSSSSS!!!!!!", transactions);
 
   if (transactions.length <= 0) {
@@ -235,15 +235,23 @@ app.post("/shopify-webhook-refund-order", async (req, res) => {
     return acc + parseFloat(lineItem.amount);
   }, 0);
 
+  //Need to locate an order to receive it's charge id
+  //The found order contains details from shopify store including
+  //The stripe charge ID and Customer ID
   const foundOrder = await shopify.order.get(order_id, []);
   const orderAttributes = foundOrder.note_attributes;
 
-  console.log("FOUND AN ORDER ATTRIBUTES OBJECT:", orderAttributes);
   if (!foundOrder) {
     return res
       .status(400)
       .json({ msg: "Could not find an order for this refund attempt" });
   }
+
+  if (!orderAttributes || orderAttributes.length <= 0) {
+    console.log("Item is not a detailed order");
+    return res.status(400).json({ msg: "Item is not a detailed order" });
+  }
+  console.log("FOUND AN ORDER ATTRIBUTES OBJECT:", orderAttributes);
 
   const formattedAmt = Math.ceil(amount * 100);
 
