@@ -255,6 +255,7 @@ app.post("/shopify-webhook-refund-order", async (req, res) => {
 
   const formattedAmt = Math.ceil(amount * 100);
 
+  //get the value
   const stripeChargeID = orderAttributes.filter(
     (attr) => attr.name.toLowerCase() === "stripe charge id"
   )[0].value;
