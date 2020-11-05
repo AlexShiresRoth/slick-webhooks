@@ -135,14 +135,6 @@ app.post(
               ? { order, user: obj.user, errors: [] }
               : { order: {}, user: obj.user, errors: [] };
           });
-          // console.log(
-          //   `UPDATED USER: ${
-          //     state.users.filter(
-          //       (obj) => obj.user === paymentIntent.metadata.shopifyToken
-          //     )[0].user
-          //   }`,
-          //   state.users
-          // );
 
           response.status(200);
           break;
@@ -211,7 +203,7 @@ app.post("/shopify-webhook-cancel-order", async (req, res) => {
     "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
   );
   if (!refund) {
-    res.status(400).json({ msg: "Charge already refunded" });
+    res.status(400).json({ msg: "No refund object!" });
   }
   try {
     res.json(refund);
@@ -315,7 +307,7 @@ io.on("connection", (client) => {
   client.on("add-user", (data) => {
     let foundUser = false;
     if (state.users.filter((info) => info.user === data).length > 0) {
-      // console.log("found a user", state.users);
+      console.log("found a user", state.users);
       foundUser = true;
     }
 
