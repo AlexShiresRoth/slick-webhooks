@@ -165,7 +165,7 @@ app.post("/shopify-webhook-cancel-order", async (req, res) => {
 
   if (!note_attributes || note_attributes.length === 0) {
     return res
-      .status(400)
+      .status(200)
       .json({ msg: "Not a canceled order from the framework api" });
   }
   const stripeChargeID = note_attributes.filter(
@@ -182,13 +182,13 @@ app.post("/shopify-webhook-cancel-order", async (req, res) => {
 
   if (!foundCharge) {
     return res
-      .status(400)
+      .status(200)
       .json({ msg: "Could not find a charge object with that id" });
   }
 
   if (foundCharge.refunded) {
     console.log("this is a found charge error!!!!!!!", foundCharge);
-    return res.status(400).json({ msg: "Charge was already refunded" });
+    return res.status(200).json({ msg: "Charge was already refunded" });
   }
 
   const refund = await stripe.refunds.create({
@@ -203,7 +203,7 @@ app.post("/shopify-webhook-cancel-order", async (req, res) => {
     "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
   );
   if (!refund) {
-    res.status(400).json({ msg: "No refund object!" });
+    res.status(200).json({ msg: "No refund object!" });
   }
   try {
     res.json(refund);
@@ -221,7 +221,7 @@ app.post("/shopify-webhook-refund-order", async (req, res) => {
 
   if (transactions.length <= 0) {
     console.log("Transactions are empty");
-    return res.status(400).json({ msg: "No transactions" });
+    return res.status(200).json({ msg: "No transactions" });
   }
   const amount = transactions.reduce((acc, lineItem) => {
     return acc + parseFloat(lineItem.amount);
@@ -235,13 +235,13 @@ app.post("/shopify-webhook-refund-order", async (req, res) => {
 
   if (!foundOrder) {
     return res
-      .status(400)
+      .status(200)
       .json({ msg: "Could not find an order for this refund attempt" });
   }
 
   if (!orderAttributes || orderAttributes.length <= 0) {
     console.log("Item is not a detailed order");
-    return res.status(400).json({ msg: "Item is not a detailed order" });
+    return res.status(200).json({ msg: "Item is not a detailed order" });
   }
   console.log("FOUND AN ORDER ATTRIBUTES OBJECT:", orderAttributes);
 
@@ -255,7 +255,7 @@ app.post("/shopify-webhook-refund-order", async (req, res) => {
   console.log("THIS IS THE AMOUNT FGSDGDFGDSGFDSFSDFSDFSADFSFSDF", amount);
   if (!stripeChargeID) {
     return res
-      .status(400)
+      .status(200)
       .json({ msg: "Webhook failed to locate a stripe charge id" });
   }
 
@@ -264,13 +264,13 @@ app.post("/shopify-webhook-refund-order", async (req, res) => {
   if (!foundCharge) {
     console.error("could not find a charge");
     return res
-      .status(400)
+      .status(200)
       .json({ msg: "Could not find a charge object with that id" });
   }
 
   if (foundCharge.refunded) {
     console.log("this is a found charge error!!!!!!!", foundCharge);
-    return res.status(400).json({ msg: "Charge was already refunded" });
+    return res.status(200).json({ msg: "Charge was already refunded" });
   }
 
   const refund = await stripe.refunds.create({
