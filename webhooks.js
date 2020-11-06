@@ -341,7 +341,7 @@ io.on("connection", (client) => {
   });
 
   client.on("disconnect", (data) => {
-    console.log("user disconnected", state.users);
+    // console.log("user disconnected", state.users);
 
     clearInterval(state.interval);
     clearInterval(state.interval2);
