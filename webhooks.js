@@ -322,11 +322,14 @@ io.on("connection", (client) => {
   if (state.interval) {
     clearInterval(state.interval);
   }
+  if (state.interval2) {
+    clearInterval(state.interval2);
+  }
 
   state.interval = setInterval(() => client.emit("order", state.users), 1000);
 
   //keeps sending user state to client
-  state.interval2 = setInterval(() => client.emit("users", state.users), 1000);
+  state.interval2 = setInterval(() => client.emit("users", state.users), 2000);
 
   // console.log("is there an interval?", state.users);
 
