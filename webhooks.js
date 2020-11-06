@@ -289,26 +289,26 @@ app.post("/shopify-webhook-refund-order", async (req, res) => {
 //@route POST route
 //@desc disconnect a user and remove them from user array
 //@access private
-app.post("/disconnect-user", async (req, res) => {
-  const { userToken } = req.body;
+// app.post("/disconnect-user", async (req, res) => {
+//   const { userToken } = req.body;
 
-  if (!userToken) {
-    return res.status(400).json({ msg: "User token was not provided" });
-  }
+//   if (!userToken) {
+//     return res.status(400).json({ msg: "User token was not provided" });
+//   }
 
-  try {
-    const filteredUsers = state.users.filter((user) => {
-      return user.user !== userToken;
-    });
+//   try {
+//     const filteredUsers = state.users.filter((user) => {
+//       return user.user !== userToken;
+//     });
 
-    state.users = filteredUsers;
+//     state.users = filteredUsers;
 
-    res.status(200).json({ msg: "User disconnected" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ msg: "Internal Server Error" });
-  }
-});
+//     res.status(200).json({ msg: "User disconnected" });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ msg: "Internal Server Error" });
+//   }
+// });
 
 const server = http.createServer(app);
 
