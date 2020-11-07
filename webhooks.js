@@ -24,6 +24,7 @@ console.log('NODE ENVIRONMENT:', process.env.NODE_ENV);
 //@route POST route
 //@desc create webhook
 //@access public
+//ENDPOINT RECEIVES EVENTS FROM MULTIPLE STORE SITES, TREAT ALL PROCESSES THAT DO NOT HAVE SHOPIFYTOKEN AS AN OK RESPONSE
 app.post('/stripe', require('body-parser').raw({ type: '*/*' }), async (request, response) => {
 	const signature = request.headers['stripe-signature'];
 	let event;
@@ -31,15 +32,17 @@ app.post('/stripe', require('body-parser').raw({ type: '*/*' }), async (request,
 
 	try {
 		event = stripe.webhooks.constructEvent(request.body, signature, process.env.STRIPE_SIGNING_SECRET);
-		console.log('this is the event object from signature', event.data);
+		console.log('SIGNING SECRET, SUCCESSFUL');
 	} catch (err) {
 		console.log('ERROR FROM STRIPE ENDPOINT:', err);
 		return response.status(400).json({ msg: 'Webhook error' });
 	}
 
 	if (!event.data.object.metadata.shopifyToken) {
-		console.error('No Shopify authroization');
-		return response.status(200).json({ msg: 'Unauthorized order, process not originating from pendant kit' });
+		console.error('WEBHOOK OK, No Shopify authroization');
+		return response
+			.status(200)
+			.json({ msg: 'WEBHOOK OK, Unauthorized order, process not originating from pendant kit' });
 	}
 
 	try {
@@ -50,8 +53,6 @@ app.post('/stripe', require('body-parser').raw({ type: '*/*' }), async (request,
 				break;
 			case 'payment_intent.succeeded':
 				const paymentIntent = event.data.object;
-
-				console.log('this is a payment intent', paymentIntent);
 
 				order = await handleOrderProcessing(paymentIntent);
 				//order processing error? break out of hook and send a failing response
@@ -64,6 +65,7 @@ app.post('/stripe', require('body-parser').raw({ type: '*/*' }), async (request,
 
 					return response.status(500).json(order);
 				}
+				console.log('ORDER HAS PROCESSED IN PAYMENT INTENT EVENT', order);
 				console.log(`PaymentIntent for ${paymentIntent.amount} was successful`);
 
 				response.status(200);
@@ -166,64 +168,64 @@ app.post('/shopify-webhook-refund-order', async (req, res) => {
 	const { transactions, order_id } = req.body;
 	console.log('TRANSACTIONSSSSSS!!!!!!', transactions);
 
-	if (transactions.length <= 0) {
-		console.log('Transactions are empty');
-		return res.status(200).json({ msg: 'No transactions' });
-	}
-	const amount = transactions.reduce((acc, lineItem) => {
-		return acc + parseFloat(lineItem.amount);
-	}, 0);
-
-	//Need to locate an order to receive it's charge id
-	//The found order contains details from shopify store including
-	//The stripe charge ID and Customer ID
-	const foundOrder = await shopify.order.get(order_id, []);
-	const orderAttributes = foundOrder.note_attributes;
-
-	if (!foundOrder) {
-		return res.status(200).json({ msg: 'Could not find an order for this refund attempt' });
-	}
-
-	if (!orderAttributes || orderAttributes.length <= 0) {
-		console.log('Item is not a detailed order');
-		return res.status(200).json({ msg: 'Item is not a detailed order' });
-	}
-	console.log('FOUND AN ORDER ATTRIBUTES OBJECT:', orderAttributes);
-
-	const formattedAmt = Math.floor(amount * 100);
-
-	//get the value
-	const stripeChargeID = orderAttributes.filter((attr) => attr.name.toLowerCase() === 'stripe charge id')[0].value;
-
-	console.log('THIS IS THE AMOUNT FGSDGDFGDSGFDSFSDFSDFSADFSFSDF', amount);
-
-	if (!stripeChargeID) {
-		return res.status(200).json({ msg: 'Webhook failed to locate a stripe charge id' });
-	}
-
-	const foundCharge = await stripe.charges.retrieve(stripeChargeID);
-
-	if (!foundCharge) {
-		console.error('could not find a charge');
-		return res.status(200).json({ msg: 'Could not find a charge object with that id' });
-	}
-
-	if (process.env.NODE_ENV === 'production' && !foundCharge.livemode) {
-		console.error('test charge used in live mode');
-		return res.status(200).json({ msg: 'Test charge used in live mode' });
-	}
-
-	if (foundCharge.refunded) {
-		console.log('this is a found charge error!!!!!!!', foundCharge);
-		return res.status(200).json({ msg: 'Charge was already refunded' });
-	}
-
-	const refund = await stripe.refunds.create({
-		charge: stripeChargeID,
-		amount: formattedAmt ? formattedAmt : 0,
-	});
-
 	try {
+		if (transactions.length <= 0) {
+			console.log('Transactions are empty');
+			return res.status(200).json({ msg: 'No transactions' });
+		}
+		const amount = transactions.reduce((acc, lineItem) => {
+			return acc + parseFloat(lineItem.amount);
+		}, 0);
+
+		//Need to locate an order to receive it's charge id
+		//The found order contains details from shopify store including
+		//The stripe charge ID and Customer ID
+		const foundOrder = await shopify.order.get(order_id, []);
+		const orderAttributes = foundOrder.note_attributes;
+
+		if (!foundOrder) {
+			return res.status(200).json({ msg: 'Could not find an order for this refund attempt' });
+		}
+
+		if (!orderAttributes || orderAttributes.length <= 0) {
+			console.log('Item is not a detailed order');
+			return res.status(200).json({ msg: 'Item is not a detailed order' });
+		}
+		console.log('FOUND AN ORDER ATTRIBUTES OBJECT:', orderAttributes);
+
+		const formattedAmt = Math.floor(amount * 100);
+
+		//get the value
+		const stripeChargeID = orderAttributes.filter((attr) => attr.name.toLowerCase() === 'stripe charge id')[0]
+			.value;
+
+		console.log('THIS IS THE AMOUNT FGSDGDFGDSGFDSFSDFSDFSADFSFSDF', amount);
+
+		if (!stripeChargeID) {
+			return res.status(200).json({ msg: 'Webhook failed to locate a stripe charge id' });
+		}
+
+		const foundCharge = await stripe.charges.retrieve(stripeChargeID);
+
+		if (!foundCharge) {
+			console.error('could not find a charge');
+			return res.status(200).json({ msg: 'Could not find a charge object with that id' });
+		}
+
+		if (process.env.NODE_ENV === 'production' && !foundCharge.livemode) {
+			console.error('test charge used in live mode');
+			return res.status(200).json({ msg: 'Test charge used in live mode' });
+		}
+
+		if (foundCharge.refunded) {
+			console.log('this is a found charge error!!!!!!!', foundCharge);
+			return res.status(200).json({ msg: 'Charge was already refunded' });
+		}
+
+		const refund = await stripe.refunds.create({
+			charge: stripeChargeID,
+			amount: formattedAmt ? formattedAmt : 0,
+		});
 		res.json(refund);
 	} catch (error) {
 		console.error('there was an error processing the refund', error);
