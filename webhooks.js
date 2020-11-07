@@ -33,13 +33,13 @@ app.post('/stripe', require('body-parser').raw({ type: '*/*' }), async (request,
 		event = stripe.webhooks.constructEvent(request.body, signature, process.env.STRIPE_SIGNING_SECRET);
 		console.log('this is the event object from signature', event.data);
 	} catch (err) {
-		console.log(err);
+		console.log('ERROR FROM STRIPE ENDPOINT:', err);
 		return response.status(400).json({ msg: 'Webhook error' });
 	}
 
 	if (!event.data.object.metadata.shopifyToken) {
 		console.error('No Shopify authroization');
-		return res.status(200).json({ msg: 'Unauthorized order, process not originating from pendant kit' });
+		return response.status(200).json({ msg: 'Unauthorized order, process not originating from pendant kit' });
 	}
 
 	try {
@@ -79,7 +79,7 @@ app.post('/stripe', require('body-parser').raw({ type: '*/*' }), async (request,
 				break;
 		}
 	} catch (error) {
-		console.log('ERROROROROROROROR', error);
+		console.error('ERROR FROM STRIPE ENDPOINT CATCH BLOCK:', error);
 		response.status(500).json({ msg: error.response });
 	}
 
@@ -115,42 +115,44 @@ app.post('/shopify-webhook-cancel-order', async (req, res) => {
 	const { note_attributes } = req.body;
 	console.log('CANCELING ORDER:', note_attributes);
 
-	if (!note_attributes || note_attributes.length === 0) {
-		return res.status(200).json({ msg: 'Not a canceled order from the framework api' });
-	}
-	const stripeChargeID = note_attributes.filter((attr) => attr.name.toLowerCase() === 'stripe charge id')[0].value;
-
-	if (!stripeChargeID) {
-		return res.status(200).json({ msg: 'Webhook failed to locate a stripe charge id' });
-	}
-
-	const foundCharge = await stripe.charges.retrieve(stripeChargeID);
-
-	if (!foundCharge) {
-		return res.status(200).json({ msg: 'Could not find a charge object with that id' });
-	}
-
-	if (process.env.NODE_ENV === 'production' && !foundCharge.livemode) {
-		console.error('test charge used in live mode');
-		return res.status(200).json({ msg: 'Test charge used in live mode' });
-	}
-
-	if (foundCharge.refunded) {
-		console.log('this is a found charge error!!!!!!!', foundCharge);
-		return res.status(200).json({ msg: 'Charge was already refunded' });
-	}
-
-	const refund = await stripe.refunds.create({
-		charge: stripeChargeID,
-	});
-
-	console.log('THIS IS THE REFUND OBJECT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-	console.log(refund.status);
-	console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-	if (!refund) {
-		res.status(200).json({ msg: 'No refund object!' });
-	}
 	try {
+		if (!note_attributes || note_attributes.length === 0) {
+			return res.status(200).json({ msg: 'Not a canceled order from the framework api' });
+		}
+		const stripeChargeID = note_attributes.filter((attr) => attr.name.toLowerCase() === 'stripe charge id')[0]
+			.value;
+
+		if (!stripeChargeID) {
+			console.error('ERROR FROM SHOPIFY WEBHOOK CANCEL ORDER ENDPOINT:');
+			return res.status(200).json({ msg: 'Webhook failed to locate a stripe charge id' });
+		}
+
+		const foundCharge = await stripe.charges.retrieve(stripeChargeID);
+
+		if (!foundCharge) {
+			return res.status(200).json({ msg: 'Could not find a charge object with that id' });
+		}
+
+		if (process.env.NODE_ENV === 'production' && !foundCharge.livemode) {
+			console.error('test charge used in live mode');
+			return res.status(200).json({ msg: 'Test charge used in live mode' });
+		}
+
+		if (foundCharge.refunded) {
+			console.log('this is a found charge error!!!!!!!', foundCharge);
+			return res.status(200).json({ msg: 'Charge was already refunded' });
+		}
+
+		const refund = await stripe.refunds.create({
+			charge: stripeChargeID,
+		});
+
+		console.log('THIS IS THE REFUND OBJECT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+		console.log(refund.status);
+		console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+		if (!refund) {
+			res.status(200).json({ msg: 'No refund object!' });
+		}
 		res.json(refund);
 	} catch (error) {
 		console.error('there was an error processing the refund', error);
