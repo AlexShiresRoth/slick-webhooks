@@ -120,13 +120,18 @@ app.post('/shopify-webhook-cancel-order', async (req, res) => {
 	const stripeChargeID = note_attributes.filter((attr) => attr.name.toLowerCase() === 'stripe charge id')[0].value;
 
 	if (!stripeChargeID) {
-		return res.status(400).json({ msg: 'Webhook failed to locate a stripe charge id' });
+		return res.status(200).json({ msg: 'Webhook failed to locate a stripe charge id' });
 	}
 
 	const foundCharge = await stripe.charges.retrieve(stripeChargeID);
 
 	if (!foundCharge) {
 		return res.status(200).json({ msg: 'Could not find a charge object with that id' });
+	}
+
+	if (process.env.NODE_ENV === 'production' && !foundCharge.livemode) {
+		console.error('test charge used in live mode');
+		return res.status(200).json({ msg: 'Test charge used in live mode' });
 	}
 
 	if (foundCharge.refunded) {
@@ -188,6 +193,7 @@ app.post('/shopify-webhook-refund-order', async (req, res) => {
 	const stripeChargeID = orderAttributes.filter((attr) => attr.name.toLowerCase() === 'stripe charge id')[0].value;
 
 	console.log('THIS IS THE AMOUNT FGSDGDFGDSGFDSFSDFSDFSADFSFSDF', amount);
+
 	if (!stripeChargeID) {
 		return res.status(200).json({ msg: 'Webhook failed to locate a stripe charge id' });
 	}
@@ -197,6 +203,11 @@ app.post('/shopify-webhook-refund-order', async (req, res) => {
 	if (!foundCharge) {
 		console.error('could not find a charge');
 		return res.status(200).json({ msg: 'Could not find a charge object with that id' });
+	}
+
+	if (process.env.NODE_ENV === 'production' && !foundCharge.livemode) {
+		console.error('test charge used in live mode');
+		return res.status(200).json({ msg: 'Test charge used in live mode' });
 	}
 
 	if (foundCharge.refunded) {
