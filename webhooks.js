@@ -37,6 +37,11 @@ app.post('/stripe', require('body-parser').raw({ type: '*/*' }), async (request,
 		return response.status(400).json({ msg: 'Webhook error' });
 	}
 
+	if (!event.data.object.metadata.shopifyToken) {
+		console.error('No Shopify authroization');
+		return res.status(200).json({ msg: 'Unauthorized order, process not originating from pendant kit' });
+	}
+
 	try {
 		switch (event.type) {
 			case 'payment_intent.created':
@@ -47,11 +52,6 @@ app.post('/stripe', require('body-parser').raw({ type: '*/*' }), async (request,
 				const paymentIntent = event.data.object;
 
 				console.log('this is a payment intent', paymentIntent);
-				if (!paymentIntent.metadata.shopifyToken) {
-					return res
-						.status(200)
-						.json({ msg: 'Unauthorized order, process not originating from pendant kit' });
-				}
 
 				order = await handleOrderProcessing(paymentIntent);
 				//order processing error? break out of hook and send a failing response
@@ -86,6 +86,7 @@ app.post('/stripe', require('body-parser').raw({ type: '*/*' }), async (request,
 	response.status(200).json({ msg: 'Order processed' });
 });
 
+//need to use bodyparse for first route^^ the rest is express
 app.use(express.json({ extended: false }));
 
 app.get('/api', (req, res) => res.send('WEBHOOK IS RUNNING'));
